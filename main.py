@@ -17,22 +17,30 @@ app = FastAPI(lifespan=lifespan)
 @app.websocket("/ws/task/{task_id}")
 async def task_progress_ws(websocket:  WebSocket, task_id:str):
     await websocket.accept()
+    channel = f"progress-channel:{task_id}"
+
+    current = await app.state.redis.get(f"progress:{task_id}")
+    current = int(current) if current is not None else 0
+    await websocket.send_json({"task_id": task_id, "progress": current})
+    if current >= 100:
+        return
+
+    pubsub = app.state.redis.pubsub()
+    await pubsub.subscribe(channel)
     try:
-        last_sent = None
-        while True:
-            percent = await app.state.redis.get(f"progress:{task_id}")
-            percent = int(percent) if percent is not None else 0
-
-            if percent != last_sent:
-                await websocket.send_json({"task_id": task_id, "progress": percent})
-                last_sent = percent
-
+        async for message in pubsub.listen():
+            if message["type"] != "message":
+                continue
+            percent = int(message["data"])
+            await websocket.send_json({"task_id": task_id, "progress": percent})
             if percent >= 100:
                 break
-
-            await asyncio.sleep(0.5)
     except WebSocketDisconnect:
-            pass            
+        pass
+    finally:
+        await pubsub.unsubscribe(channel)                    
+
+            
 
 @app.post("/task/submit")
 async def submit_task(total_steps:int = 10):
