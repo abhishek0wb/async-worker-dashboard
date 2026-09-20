@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>Task progress: <span id="p">0</span>%</h2>
+  <script>
+    const taskId = prompt("Enter task_id:");
+    const ws = new WebSocket(`ws://localhost:8000/ws/task/${taskId}`);
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      document.getElementById("p").textContent = data.progress;
+      console.log("pushed:", data);
+    };
+    ws.onclose = () => console.log("connection closed");
+  </script>
+</body>
+</html>
