@@ -2,3 +2,5 @@ fastAPI
 uvicorn
 arq
 redis
+SQLALchemy
+asyncpg
